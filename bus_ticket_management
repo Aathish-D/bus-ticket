@@ -1,0 +1,374 @@
+import java.sql.*;
+import java.util.*;
+
+public class Database 
+{
+	static Connection con=null;
+	Connection getConnection() throws Exception
+	{
+		Class.forName("com.mysql.cj.jdbc.Driver");
+		con=DriverManager.getConnection("jdbc:mysql://localhost:3306/Project","root","root");
+		return con;
+	}
+	void login()throws Exception 
+	{
+		Statement stmt=con.createStatement();
+		Scanner in=new Scanner(System.in);
+		System.out.println("Admin or user");
+		System.out.println("Press 1 for Admin");
+		System.out.println("Press 2 for User");
+		System.out.println("Press 3 tO Exit");
+		System.out.println("Enter Number :");
+		int iNum=in.nextInt();
+		if(iNum==1)
+		{
+			System.out.println("Enter Username");
+			String a_name=in.next();
+			System.out.println("Enter Password");
+			String a_pass=in.next();
+			ResultSet rs=stmt.executeQuery("Select * from admin_login where Username ='"+a_name+"' and Password ='"+a_pass+"'");
+			if(rs.next()) 
+			{
+				System.out.println("Login Successfull");
+				adminscreen(stmt,in);
+			}
+			else
+			{
+				System.out.println("Login unsuccessfull");
+				login();
+			}
+		}
+		else if(iNum==2) 
+		{
+			System.out.println("1 Existing User");
+			System.out.println("2 New User");
+			int c=in.nextInt();
+			if(c==1) {
+			System.out.println("Enter Username");
+			String u_name=in.next();
+			System.out.println("Enter Password");
+			String u_pass=in.next();
+			ResultSet rs=stmt.executeQuery("Select * from user_login where Username ='"+u_name+"' and Password ='"+u_pass+"'");
+			if(rs.next()) 
+			{
+				System.out.println("Login Successfull");
+				userscreen(stmt,in,u_name);
+			}
+			else 
+			{
+				System.out.println("Invalid Login");
+				login();
+			}
+		}else if(c==2) {
+			adduser(stmt,in);
+		}
+		}else if(iNum==3) {
+			System.out.println("Thank You");
+			System.exit(0);
+		}
+	}
+	void userscreen(Statement stmt,Scanner in,String u_name)throws Exception
+	{
+		System.out.println("1 Book tickets");
+		System.out.println("2 My tickets");
+		System.out.println("3 Cancel tickets");
+		System.out.println("4 Back to Login");
+		int c=in.nextInt();
+		switch(c) 
+		{
+		case 1:
+		{
+			booktickets(stmt,in,u_name);
+			break;
+		}
+		case 2:
+		{
+			mytickets(stmt,in,u_name);
+			break;
+		}
+		case 3:
+		{
+			canceltickets(stmt,in,u_name);
+			break;
+		}
+		case 4:
+		{
+			login();
+			break;
+		}
+		}
+//	
+		}
+		void booktickets(Statement stmt,Scanner in,String u_name)throws Exception 
+		{
+			System.out.println("From :");
+			String From=in.next();
+			System.out.println("To :");
+			String To=in.next();
+			ResultSet rs=stmt.executeQuery("Select * from bus_details where source='"+From+"' and Destination='"+To+"';");
+			int c=0;
+				while(rs.next()) 
+				{
+					System.out.println(rs.getString(1)+" "+rs.getString(2)+" "+rs.getString(3)+" "+rs.getString(4)+" "+rs.getString(5)+" "+rs.getString(6)+" "+rs.getString(7));
+					c++;
+				}if(c>0) {
+				System.out.println("Buses available");
+				System.out.println("Enter bus id to book:");
+				String id=in.next();
+				ResultSet rs1=stmt.executeQuery("Select seat_availability from bus_details where bus_id='"+id+"';");
+				rs1.next();
+				int capacity=rs1.getInt(1);
+				System.out.println("Enter No. of Tickets :");
+				int seat=in.nextInt();
+				if(seat<capacity)
+				{
+				int sub=capacity-seat;
+				int r=stmt.executeUpdate("update bus_details set  seat_availability='"+sub+"' where bus_id='"+id+"'");
+	//			
+				int t=stmt.executeUpdate("update user_login set  tickets='"+seat+"',bus_id='"+id+"' where username='"+u_name+"'");
+				System.out.println(seat+" tickets booked");
+				userscreen(stmt,in,u_name);
+				}else 
+				{
+					System.out.println("Only "+capacity+" tickets are available");
+					userscreen(stmt,in,u_name);
+				}}
+			
+				else if(c==0)
+			{
+				System.out.println("Bus not available");
+				userscreen(stmt,in,u_name);
+			}
+		}
+		void mytickets(Statement stmt,Scanner in,String u_name)throws Exception{
+			ResultSet rs=stmt.executeQuery("select u.bus_id,u.tickets,b.source,b.Destination,b.traveldate,b.class from user_login u join bus_details b on u.bus_id=b.bus_id where username='"+u_name+"';");
+			while(rs.next()) 
+			{
+				System.out.println(rs.getString(1)+" "+rs.getString(2)+" "+rs.getString(3)+" "+rs.getString(4)+" "+rs.getString(5)+" "+rs.getString(6));
+			}userscreen(stmt,in,u_name);
+		}
+		void canceltickets(Statement stmt,Scanner in,String u_name)throws Exception{
+			ResultSet rs1=stmt.executeQuery("Select tickets from user_login where username='"+u_name+"';");
+			rs1.next();
+			int tickets=rs1.getInt(1);
+			System.out.println("You have "+tickets+" tickets");
+			if(tickets>1) {
+				System.out.println("Enter No. of Tickets to be cancelled:");
+				int seat=in.nextInt();
+				if(seat<tickets) {
+				tickets=tickets-seat;
+				ResultSet rs=stmt.executeQuery("Select bus_id from user_login where username='"+u_name+"';");
+				rs.next();
+				String id=rs.getString(1);
+				ResultSet s1=stmt.executeQuery("Select seat_availability from bus_details where bus_id='"+id+"';");
+				s1.next();
+				int capacity=s1.getInt(1);
+				
+				int add=capacity+seat;
+				int r=stmt.executeUpdate("update bus_details set  seat_availability='"+add+"' where bus_id='"+id+"'");
+				int rs2=stmt.executeUpdate("update user_login set tickets="+tickets+" where username='"+u_name+"'");
+				System.out.println("Your tickets are Cancelled ");
+				userscreen(stmt,in,u_name);}
+				else {
+					System.out.println("Your dont have enough tickets");
+					userscreen(stmt,in,u_name);
+				}
+			}
+			else if(tickets==1)
+			{
+				int rs2=stmt.executeUpdate("update user_login set tickets=0 where user_name='"+u_name+"'");
+		          if(rs2==1)
+		          {
+		        	  System.out.println("Your ticket is Cancelled ");
+		          }userscreen(stmt,in,u_name);
+			}
+			else
+			{
+				System.out.println("Your dont have any tickets");
+				userscreen(stmt,in,u_name);
+			}
+		}
+		void adduser(Statement stmt,Scanner in)throws Exception{
+			
+		System.out.println("Enter Username");
+		String u_name=in.next();
+		System.out.println("Enter Password");
+		String u_pass=in.next();
+		int r=stmt.executeUpdate("Insert into user_login (username,Password) values ('"+u_name+"','"+u_pass+"');");
+		System.out.println("User added successfully");
+		login();
+		}
+	void adminscreen(Statement stmt,Scanner in)throws Exception 
+	{
+		System.out.println("1 Add Bus");			
+		System.out.println("2 Update Price");
+		System.out.println("3 Update Location");
+		System.out.println("4 Update Travel Date");
+		System.out.println("5 Update Seating capacity");
+		System.out.println("6 Delete Bus");
+		System.out.println("7 Exit");
+		int c=in.nextInt();
+		switch(c) 
+		{
+		case 1:
+		{
+			addbus(stmt,in);
+			break;
+		}
+		case 2:
+		{
+			updateprice(stmt,in);
+			break;
+		}
+		case 3:
+		{
+			updatelocation(stmt,in);
+			break;
+		}
+		case 4:
+		{
+			updatedate(stmt,in);
+			break;
+		}
+		case 5:
+		{
+			updateseat(stmt,in);
+			break;
+		}
+		case 6:
+		{
+			deletebus(stmt,in);
+			break;
+		}case 7:
+		{
+			login();
+			break;
+		}
+		
+		}
+	}
+	void addbus(Statement stmt,Scanner in)throws Exception 
+	{
+		System.out.println("Enter bus id :");
+		String id=in.next();
+		System.out.println("Enter source :");
+		String source=in.next();
+		System.out.println("Enter Destination :");
+		String destination=in.next();
+		System.out.println("Enter Travel Date :");
+		String tdate=in.next();
+		System.out.println("Enter Available Seat :");
+		String seat=in.next();
+		System.out.println("Enter Busclass :");
+		String b=in.next();
+		System.out.println("Enter price :");
+		String price=in.next();
+		String sql="Insert into bus_details values('"+id+"','"+source+"','"+destination+"','"+tdate+"','"+seat+"','"+b+"','"+price+"')";
+		int r=stmt.executeUpdate(sql);
+		ResultSet rs=stmt.executeQuery("Select * from bus_details;");
+		while(rs.next()) 
+		{
+			System.out.println(rs.getString(1)+" "+rs.getString(2)+" "+rs.getString(3)+" "+rs.getString(4)+" "+rs.getString(5)+" "+rs.getString(6)+" "+rs.getString(7));
+		}				adminscreen(stmt,in);
+
+	}
+	void updateprice(Statement stmt,Scanner in)throws Exception{
+		ResultSet rqs=stmt.executeQuery("Select * from bus_details;");
+		while(rqs.next()) 
+		{
+			System.out.println(rqs.getString(1)+" "+rqs.getString(2)+" "+rqs.getString(3)+" "+rqs.getString(4)+" "+rqs.getString(5)+" "+rqs.getString(6)+" "+rqs.getString(7));
+		}
+		System.out.println("Enter Bus id :");
+		String id=in.next();
+		System.out.println("Enter New price :");
+		String price=in.next();
+		int r=stmt.executeUpdate("update bus_details set price='"+price+"' where bus_id='"+id+"'");
+		ResultSet rs=stmt.executeQuery("Select * from bus_details;");
+		while(rs.next()) 
+		{
+			System.out.println(rs.getString(1)+" "+rs.getString(2)+" "+rs.getString(3)+" "+rs.getString(4)+" "+rs.getString(5)+" "+rs.getString(6)+" "+rs.getString(7));
+		}				adminscreen(stmt,in);
+
+	}
+	void updatelocation(Statement stmt,Scanner in)throws Exception{
+		ResultSet rqs=stmt.executeQuery("Select * from bus_details;");
+		while(rqs.next()) 
+		{
+			System.out.println(rqs.getString(1)+" "+rqs.getString(2)+" "+rqs.getString(3)+" "+rqs.getString(4)+" "+rqs.getString(5)+" "+rqs.getString(6)+" "+rqs.getString(7));
+		}
+		System.out.println("Enter Bus id :");
+		String id=in.next();
+		System.out.println("Enter source :");
+		String source=in.next();
+		System.out.println("Enter Destination :");
+		String destination=in.next();
+		int r=stmt.executeUpdate("update bus_details set source='"+source+"',Destination='"+destination+"' where bus_id='"+id+"'");
+		ResultSet rs=stmt.executeQuery("Select * from bus_details;");
+		while(rs.next()) 
+		{
+			System.out.println(rs.getString(1)+" "+rs.getString(2)+" "+rs.getString(3)+" "+rs.getString(4)+" "+rs.getString(5)+" "+rs.getString(6)+" "+rs.getString(7));
+		}				adminscreen(stmt,in);
+
+	}
+	void updatedate(Statement stmt,Scanner in)throws Exception{
+		ResultSet rqs=stmt.executeQuery("Select * from bus_details;");
+		while(rqs.next()) 
+		{
+			System.out.println(rqs.getString(1)+" "+rqs.getString(2)+" "+rqs.getString(3)+" "+rqs.getString(4)+" "+rqs.getString(5)+" "+rqs.getString(6)+" "+rqs.getString(7));
+		}
+		System.out.println("Enter Bus id :");
+		String id=in.next();
+		System.out.println("Enter New date :");
+		String date=in.next();
+		int r=stmt.executeUpdate("update bus_details set  traveldate='"+date+"' where bus_id='"+id+"'");
+		ResultSet rs=stmt.executeQuery("Select * from bus_details;");
+		while(rs.next()) 
+		{
+			System.out.println(rs.getString(1)+" "+rs.getString(2)+" "+rs.getString(3)+" "+rs.getString(4)+" "+rs.getString(5)+" "+rs.getString(6)+" "+rs.getString(7));
+		}				adminscreen(stmt,in);
+
+	}
+	void updateseat(Statement stmt,Scanner in)throws Exception{
+		ResultSet rqs=stmt.executeQuery("Select * from bus_details;");
+		while(rqs.next()) 
+		{
+			System.out.println(rqs.getString(1)+" "+rqs.getString(2)+" "+rqs.getString(3)+" "+rqs.getString(4)+" "+rqs.getString(5)+" "+rqs.getString(6)+" "+rqs.getString(7));
+		}
+		System.out.println("Enter Bus id :");
+		String id=in.next();
+		System.out.println("Enter New seating capacity :");
+		String seat=in.next();
+		int r=stmt.executeUpdate("update bus_details set  seat_availability='"+seat+"' where bus_id='"+id+"'");
+		ResultSet rs=stmt.executeQuery("Select * from bus_details;");
+		while(rs.next()) 
+		{
+			System.out.println(rs.getString(1)+" "+rs.getString(2)+" "+rs.getString(3)+" "+rs.getString(4)+" "+rs.getString(5)+" "+rs.getString(6)+" "+rs.getString(7));
+		}				adminscreen(stmt,in);
+
+	}
+	void deletebus(Statement stmt,Scanner in)throws Exception{
+		ResultSet rs=stmt.executeQuery("Select * from bus_details;");
+		while(rs.next()) 
+		{
+			System.out.println(rs.getString(1)+" "+rs.getString(2)+" "+rs.getString(3)+" "+rs.getString(4)+" "+rs.getString(5)+" "+rs.getString(6)+" "+rs.getString(7));
+		}
+		System.out.println("Enter bus id :");
+		String id=in.next();
+		int r=stmt.executeUpdate("DELETE FROM bus_details WHERE bus_id='"+id+"'");
+		ResultSet rqs=stmt.executeQuery("Select * from bus_details;");
+		while(rqs.next()) 
+		{
+			System.out.println(rqs.getString(1)+" "+rqs.getString(2)+" "+rqs.getString(3)+" "+rqs.getString(4)+" "+rqs.getString(5)+" "+rqs.getString(6)+" "+rqs.getString(7));
+		}				adminscreen(stmt,in);
+
+	}
+	public static void main(String[] args)throws Exception 
+	{
+		System.out.println("******srt Travels*********");
+		System.out.println();
+		Database c=new Database();
+		c.getConnection();
+		c.login();
+	}
+
+}
